@@ -32,8 +32,12 @@ jobs:
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-report
+        # Make the artifact name unique per workflow run and matrix entry to
+        # avoid 409 Conflict when the same name is uploaded multiple times.
+        name: coverage-report-${{ github.run_id }}-${{ matrix.node-version }}
         path: coverage/
+        # Don't fail the job if there are no coverage files generated
+        if-no-files-found: warn
         
   deploy:
     needs: test
