@@ -37,7 +37,8 @@ jobs:
         
   deploy:
     needs: test
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    # Only deploy when the test job succeeded and we're on the main/master branch
+    if: needs.test.result == 'success' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     
     steps:
