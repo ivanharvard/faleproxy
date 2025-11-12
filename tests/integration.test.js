@@ -3,6 +3,7 @@ const cheerio = require('cheerio');
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
+const fs = require('fs').promises;
 const { sampleHtmlWithYale } = require('./test-utils');
 const nock = require('nock');
 
@@ -14,29 +15,24 @@ describe('Integration Tests', () => {
   // Modify the app to use a test port
   beforeAll(async () => {
     // Mock external HTTP requests
-    nock.disableNetConnect();
-    nock.enableNetConnect('127.0.0.1');
+  nock.disableNetConnect();
+  // Allow connections to the local test server (both localhost and 127.0.0.1)
+  nock.enableNetConnect('127.0.0.1');
+  nock.enableNetConnect('localhost');
     
-    // Create a temporary test app file
-    await execAsync('cp app.js app.test.js');
-    await execAsync(`sed -i '' 's/const PORT = 3001/const PORT = ${TEST_PORT}/' app.test.js`);
-    
-    // Start the test server
-    server = require('child_process').spawn('node', ['app.test.js'], {
-      detached: true,
-      stdio: 'ignore'
-    });
-    
-    // Give the server time to start
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Start the app in-process so nock (in this test process) can intercept
+    // outbound HTTP requests made by the app.
+    const app = require('../app');
+    server = app.listen(TEST_PORT);
+    // Give the server a moment to start
+    await new Promise(resolve => setTimeout(resolve, 500));
   }, 10000); // Increase timeout for server startup
 
   afterAll(async () => {
-    // Kill the test server and clean up
-    if (server && server.pid) {
-      process.kill(-server.pid);
+    // Close the in-process server and clean up
+    if (server && server.close) {
+      await new Promise(resolve => server.close(resolve));
     }
-    await execAsync('rm app.test.js');
     nock.cleanAll();
     nock.enableNetConnect();
   });
